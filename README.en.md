@@ -202,6 +202,17 @@ navigate → auth check → setup mode (self-verifying) → find editor → type
 
 Every AI-specific difference (selectors, delays, send key, reply container, mode setup, post-processing) lives in `providers/*.js`; the engine implements only stable, generic steps — **adding a new AI means adding one config file**.
 
+Mode auto-enabled per AI (set and self-verified at runtime by `setupMode`; these modes don't persist across sessions on the web side, so they're re-enabled on every run):
+
+| AI | Auto-enabled mode | Notes |
+|----|-------------------|-------|
+| ChatGPT | Web search | Click the "search the web" suggestion chip above the composer to enter the highlighted web-search state |
+| Qwen | Web search | "+" menu → More → web search; thinking mode is already on by default |
+| DeepSeek | Expert mode | Pick from Quick / Expert / Vision in an empty chat; must be set before the session starts |
+| Doubao | Expert mode | Expert research-grade Q&A (2.1 Turbo) |
+| AI Studio | Grounding with Google Search | Gemini 3.1 Pro, model set directly via URL |
+| Kimi | None needed | Works out of the box with its long-context default |
+
 **Machine contract** (between scripts and the upper agent):
 
 | Stream | Content |
