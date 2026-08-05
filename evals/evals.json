@@ -1,0 +1,23 @@
+{
+  "skill_name": "multi-ai-chat-skill",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我问 6 个 AI 同一个问题：为什么从网页 AI 回复里用 innerText 提取文本会丢失格式？有什么缓解办法？然后帮我做一份技术决策文档。",
+      "expected_output": "一份 AI Decision & Solution Document：Executive Summary → 方案 → 实施计划 → 备选方案 → 风险 → AI 洞察 → 可信度 → 回执",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "并行问这几个 AI：2026 年个人开发者做后端，Node.js 和 Python 怎么选？帮我出一个技术选型决策文档。",
+      "expected_output": "技术选型决策文档：结论摘要 → 选型推荐 → 备选对比 → 风险 → 决策依据",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "用 6 个 AI 对比一下 REST API 和 GraphQL，帮我出一份技术方案文档。",
+      "expected_output": "技术方案文档：结论 → 推荐方案 → 实施 → 备选 → 风险 → AI 洞察 → 回执",
+      "files": []
+    }
+  ]
+}

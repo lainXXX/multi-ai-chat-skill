@@ -1,0 +1,17 @@
+{
+  "name": "multi-ai-chat-skill",
+  "version": "0.2.0",
+  "private": false,
+  "license": "MIT",
+  "description": "多 web AI 自动化（自包含）：登录 / 运行时 / 单问 / 6 路并行",
+  "scripts": {
+    "login": "node scripts/login.js",
+    "ask": "node scripts/ask.js",
+    "multi-ai-chat": "node scripts/multi-ai-chat.js",
+    "doctor": "node scripts/doctor.js"
+  },
+  "dependencies": {
+    "js-yaml": "^5.2.3",
+    "playwright-core": "^1.61.0"
+  }
+}
