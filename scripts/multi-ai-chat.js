@@ -31,9 +31,12 @@ if (!PROVIDERS.length) {
     process.exit(64);
 }
 
-function runOne(cfg, prompt, outDir) {
+function runOne(cfg, prompt, outDir, idx = 0) {
     return new Promise((resolve) => {
         const start = Date.now();
+        // 错开启动：6 个子进程同时导航共享 Chrome 会拉高页面加载、导致模式设置/问答失败，
+        // 按 index 错开 1.5s，让每个 provider 错峰占浏览器注意力。
+        const delay = idx * 1500;
         const attempt = (n) => {
             log('multi-ai-chat', `▶ ${cfg.name}: 派发中...${n > 1 ? `（第${n}次尝试）` : ''}`);
             const child = spawn(process.execPath, [ASK, `--only=${cfg.key}`, `--timeout=${PER_PROVIDER_MS}`, prompt], {
@@ -61,7 +64,7 @@ function runOne(cfg, prompt, outDir) {
                 resolve({ key: cfg.key, name: cfg.name, ok: false, error: e.message });
             });
         };
-        attempt(1);
+        setTimeout(() => attempt(1), delay);
     });
 }
 
@@ -81,7 +84,7 @@ async function main() {
     fs.mkdirSync(rawDir, { recursive: true });
 
     const start = Date.now();
-    const results = await Promise.all(PROVIDERS.map((cfg) => runOne(cfg, prompt, rawDir)));
+    const results = await Promise.all(PROVIDERS.map((cfg, i) => runOne(cfg, prompt, rawDir, i)));
 
     const okCount = results.filter((r) => r.ok).length;
     const receipt = emitReceipt({

@@ -19,7 +19,12 @@ module.exports = {
         '[role="textbox"]',
     ],
     sendFallback: 'Enter',
+    // 完整 AI 回复容器（2026-08 实测）：response-message-content / qwen-chat-message-assistant
+    // 含整条回复；[class*="markdown"] 只匹配回复内部的零碎小片段，会截断，放最后兜底。
     responseSelectors: [
+        '[class*="response-message-content"]',
+        '[class*="phase-answer"]',
+        '[class*="qwen-chat-message-assistant"]',
         '[class*="markdown"]',
         '[class*="answer"]',
         '[class*="message"]',

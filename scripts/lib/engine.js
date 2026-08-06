@@ -124,12 +124,20 @@ async function drive(cfg, prompt, opts = {}) {
         }
 
         // 模式/模型设置（各 provider 的 setupMode：如 DeepSeek 深度思考、AI Studio 选模型）
-        // 失败不阻塞问答，只记录（模式是增强项，问答是主目标）
+        // setupMode 返回 false = 未生效 → 重试（cfg.setupModeRetries，默认 2 次）。
+        // 并行 6 子进程共享同一 Chrome 时页面加载慢，固定等待常不足，所以必须按
+        // provider 自校验 + 失败重试。重试后仍失败不阻塞问答，只记录。
         if (typeof cfg.setupMode === 'function') {
-            try {
-                await cfg.setupMode(page);
-            } catch (e) {
-                process.stderr.write(`[engine] ${cfg.name} setupMode 失败(继续): ${e.message}\n`);
+            const retries = cfg.setupModeRetries ?? 2;
+            for (let i = 0; i <= retries; i++) {
+                try {
+                    const ok = await cfg.setupMode(page);
+                    if (ok !== false) break;
+                    process.stderr.write(`[engine] ${cfg.name} setupMode 未生效，重试 ${i + 1}/${retries}\n`);
+                } catch (e) {
+                    process.stderr.write(`[engine] ${cfg.name} setupMode 第${i + 1}次失败(继续重试): ${e.message}\n`);
+                }
+                await page.waitForTimeout(1500);
             }
         }
 
@@ -151,6 +159,12 @@ async function drive(cfg, prompt, opts = {}) {
         // 等待 + 提取
         const text = await waitAndExtract(page, cfg.responseSelectors, { ...cfg, timeout: opts.timeout });
         if (!text) return { success: false, reason: 'no_response' };
+
+        // 提取兜底：若拿到的"回复"其实是用户问题本身（选择器误匹配到用户气泡），
+        // 视为未拿到回复，交给上层重试，避免把问题当回答落盘。
+        if (text.trim() === prompt.trim()) {
+            return { success: false, reason: 'no_response', detail: '提取到的是用户问题本身（选择器误匹配用户气泡）' };
+        }
 
         const out = cfg.postResponseHook ? await cfg.postResponseHook(page, text) : text;
         return { success: true, response: out };
