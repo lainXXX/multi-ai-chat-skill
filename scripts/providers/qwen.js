@@ -30,7 +30,10 @@ module.exports = {
         '[class*="message"]',
     ],
     stabilityWindow: 8000,
-    minResponseLength: 5,
+    minResponseLength: 2,
+    // 联网搜索/思考中的占位态（"正在搜索网络/正在思考…"带"跳过"按钮）会稳定不变，
+    // 若不加此模式会被当成最终答案（假成功）。匹配时重置稳定性时钟，等真实回答。
+    stillGeneratingPattern: /正在搜索网络|正在思考|联网搜索/,
     postResponseHook: async (_p, t) =>
         t.replace(/^Qwen[\d.]+-(?:Max|Plus|Turbo|Flash)\s*\n?\s*/i, '').trim(),
     // 开启"网页搜索"模式（2026-08 实测：选项在 "+" 菜单 →"更多"子菜单里，需 hover 展开、点击不生效；

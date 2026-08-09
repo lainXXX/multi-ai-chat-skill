@@ -27,7 +27,7 @@ const PER_PROVIDER_MS = String(CONFIG.timeout && CONFIG.timeout.perProvider || 1
 const MAX_ATTEMPTS = 1 + (CONFIG.retry || 0);
 
 if (!PROVIDERS.length) {
-    process.stderr.write('config.yml 的 providers 列表为空或全部无效。可选: qwen/deepseek/kimi/doubao/chatgpt/aistudio\n');
+    process.stderr.write('config.yml 的 providers 列表为空或全部无效。可选: qwen/deepseek/kimi/doubao/chatgpt/gemini/grok\n');
     process.exit(64);
 }
 

@@ -11,14 +11,15 @@
 const { chromium } = require('playwright-core');
 const { CDP_URL, ensureChromeCdp } = require('./lib/cdp');
 
-// ── 6 个需要登录的站点 ──
+// ── 7 个需要登录的站点 ──
 const SITES = [
-    { name: 'Qwen',      url: 'https://chat.qwen.ai/' },
-    { name: 'DeepSeek',  url: 'https://chat.deepseek.com/' },
-    { name: 'Kimi',      url: 'https://www.kimi.com/' },
-    { name: 'Doubao',    url: 'https://www.doubao.com/chat/' },
-    { name: 'ChatGPT',   url: 'https://chatgpt.com/' },
-    { name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat' },
+    { name: 'Qwen',     url: 'https://chat.qwen.ai/' },
+    { name: 'DeepSeek', url: 'https://chat.deepseek.com/' },
+    { name: 'Kimi',     url: 'https://www.kimi.com/' },
+    { name: 'Doubao',   url: 'https://www.doubao.com/chat/' },
+    { name: 'ChatGPT',  url: 'https://chatgpt.com/' },
+    { name: 'Gemini',   url: 'https://gemini.google.com/app' },
+    { name: 'Grok',     url: 'https://grok.com/' },
 ];
 
 async function main() {

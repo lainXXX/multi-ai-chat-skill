@@ -2,7 +2,7 @@
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Free](https://img.shields.io/badge/Free-No%20API%20Key-brightgreen.svg)
-![6 Web AIs](https://img.shields.io/badge/6%20Web%20AIs-Consulted%20in%20Parallel-orange.svg)
+![7 Web AIs](https://img.shields.io/badge/7%20Web%20AIs-Consulted%20in%20Parallel-orange.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933.svg)
 
 ## Free multi-AI research assistant: let your agent consult several top AIs at once, and produce a cross-validated decision
@@ -52,11 +52,12 @@ Multiple AIs play different "experts"; Claude Code plays the host — converging
 |------|-----|-----------|
 | Host / integrator | Claude Code (main agent) | Context understanding, synthesis, decision document |
 | Expert | ChatGPT | Strong general reasoning, complex problem analysis |
-| Expert | Gemini AI Studio | Google ecosystem, search-enhanced capability |
+| Expert | Gemini | Google ecosystem, search-enhanced capability |
 | Expert | Qwen | Chinese understanding, engineering practice |
 | Expert | DeepSeek | Technical analysis, coding ability |
 | Expert | Kimi | Long-text understanding, material synthesis |
 | Expert | Doubao | Chinese scenarios, ByteDance ecosystem, fast iteration |
+| Expert | Grok | xAI ecosystem, deep reasoning, direct style |
 
 ---
 
@@ -86,13 +87,13 @@ long-term maintenance, team collaboration, and ecosystem risk.
 Give a final recommendation.
 ```
 
-This way, all AIs answer **the same real question** instead of each inventing its own context — the core difference from "copy-pasting a question to 6 chat windows."
+This way, all AIs answer **the same real question** instead of each inventing its own context — the core difference from "copy-pasting a question to 7 chat windows."
 
 ---
 
 ## 🧠 Why is multi-AI more reliable?
 
-Not because "6 AIs are always smarter than one," but because of **independent viewpoints + cross-validation** — like an expert review panel:
+Not because "7 AIs are always smarter than one," but because of **independent viewpoints + cross-validation** — like an expert review panel:
 
 ```
 expert A ──┐
@@ -116,18 +117,19 @@ implementation plan
 
 ## 🧩 Why these AIs?
 
-Not "the strongest six," but a **balanced AI panel of complementary strengths**. The choice weighs: model capability / free availability / web capabilities / search capability / Chinese-language performance / long-text ability / stability / user reach.
+Not "the strongest seven," but a **balanced AI panel of complementary strengths**. The choice weighs: model capability / free availability / web capabilities / search capability / Chinese-language performance / long-text ability / stability / user reach.
 
 | AI | Why this one |
 |----|--------------|
 | ChatGPT | Strong general reasoning, mature ecosystem |
-| Gemini AI Studio | Google search ecosystem, long context, multimodal |
+| Gemini | Google search ecosystem, long context, multimodal |
 | Kimi | Long text, Chinese material processing |
 | DeepSeek | Technical questions, programming analysis, cost-effective reasoning |
 | Qwen | Chinese ability, Alibaba ecosystem |
 | Doubao | Chinese scenarios, ByteDance ecosystem, fast iteration |
+| Grok | xAI deep reasoning, real-time information, direct style |
 
-> These six are not the only option — they're a deliberately balanced combination. You can freely add or remove any of them in `config.yml`.
+> These seven are not the only option — they're a deliberately balanced combination. You can freely add or remove any of them in `config.yml`.
 
 ---
 
@@ -163,7 +165,7 @@ Independent analysis from multiple AIs
 
 ## 💰 Truly free
 
-No commercial APIs are called. It uses the **web versions** of 6 AIs, running through **your own browser login state**:
+No commercial APIs are called. It uses the **web versions** of 7 AIs, running through **your own browser login state**:
 
 ```
 You DON'T need           You only need
@@ -188,10 +190,10 @@ All sites share **the same logged-in Chrome**, driven over CDP (Chrome DevTools 
                │  Playwright-core over CDP
 ┌──────────────▼───────────────┐
 │        Shared Chrome         │  http://127.0.0.1:9222
-│   (logged into 6 sites)      │
+│   (logged into 7 sites)      │
 └──────┬────┬────┬────┬────┬───┘
        ▼    ▼    ▼    ▼    ▼
-    Qwen DeepSeek Kimi Doubao ChatGPT · AI Studio
+    Qwen DeepSeek Kimi Doubao ChatGPT Gemini · Grok
 ```
 
 The per-AI Q&A pipeline (`lib/engine.js`):
@@ -210,8 +212,9 @@ Mode auto-enabled per AI (set and self-verified at runtime by `setupMode`; these
 | Qwen | Web search | "+" menu → More → web search; thinking mode is already on by default |
 | DeepSeek | Expert mode | Pick from Quick / Expert / Vision in an empty chat; must be set before the session starts |
 | Doubao | Expert mode | Expert research-grade Q&A (2.1 Turbo) |
-| AI Studio | Grounding with Google Search | Gemini 3.1 Pro, model set directly via URL |
+| Gemini | Extended thinking | Mode picker → "Extended thinking" (Pro + Extended Thinking); does not persist across sessions, re-enabled each run; the "Gemini 说" prefix is stripped by postResponseHook |
 | Kimi | None needed | Works out of the box with its long-context default |
+| Grok | None needed | Default Fast model, works out of the box |
 
 **Machine contract** (between scripts and the upper agent):
 
@@ -240,7 +243,7 @@ npm install
 # 2. Copy the config template and edit if needed
 cp .env.example .env
 
-# 3. Open all 6 sites → log in once in the Chrome window that pops up (reused forever)
+# 3. Open all 7 sites → log in once in the Chrome window that pops up (reused forever)
 npm run login
 
 # 4. Health check (CDP reachability + per-site tab state)
@@ -248,7 +251,7 @@ npm run doctor
 ```
 
 ```bash
-# Single ask: walk the fallback chain automatically (chatgpt → qwen → kimi → deepseek → doubao → aistudio)
+# Single ask: walk the fallback chain automatically (chatgpt → grok → qwen → kimi → deepseek → doubao → gemini)
 npm run ask -- "React 19 vs Vue 3.5: which to choose?"
 
 # Ask a specific AI
@@ -257,7 +260,7 @@ npm run ask -- --from=Kimi "How do I make a frosted-glass effect with CSS?"
 # Long content / file content via stdin
 node scripts/ask.js < question.txt
 
-# 6-way parallel: same question to all 6 AIs, answers written to disk
+# 7-way parallel: same question to all 7 AIs, answers written to disk
 npm run multi-ai-chat -- "Compare Rust vs Go for building CLI tools"
 ```
 
@@ -274,7 +277,7 @@ npm run multi-ai-chat -- "Compare Rust vs Go for building CLI tools"
 `config.yml`:
 
 ```yaml
-providers: [qwen, deepseek, kimi, doubao, chatgpt, aistudio]  # parallel list
+providers: [qwen, deepseek, kimi, doubao, chatgpt, gemini, grok]  # parallel list
 timeout:
   perProvider: 150000    # max wait per AI (ms)
 retry: 3                 # auto-retries after a per-AI failure
@@ -293,10 +296,10 @@ multi-ai-chat-skill/
 │   │   ├── config.js       # config.yml loader
 │   │   ├── receipt.js      # machine-verifiable receipts [receipt] AGENTCHAT_RUN {...}
 │   │   └── terminal.js     # stderr logging
-│   ├── providers/          # driver configs for the 6 AIs (selectors/delays/modes/post-processing)
+│   ├── providers/          # driver configs for the 7 AIs (selectors/delays/modes/post-processing)
 │   ├── multi-ai-chat.js    # 6-way parallel dispatch (entry point)
 │   ├── ask.js              # single ask (fallback chain)
-│   ├── login.js            # open the 6 sites for manual login (idempotent)
+│   ├── login.js            # open the 7 sites for manual login (idempotent)
 │   └── doctor.js           # environment health check
 ├── answers/                # raw AI answers (<timestamp>/raw/)
 ├── config.yml              # parallel AI list / timeout / retry

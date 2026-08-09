@@ -2,18 +2,19 @@
 # 改这里就能调整运行行为，不用动代码。
 
 # 并行执行的 AI（配几个并行几个）
-# 可选：qwen / deepseek / kimi / doubao / chatgpt / aistudio
+# 可选：qwen / deepseek / kimi / doubao / chatgpt / gemini / grok
 providers:
   - qwen
   - deepseek
   - kimi
   - doubao
   - chatgpt
-  - aistudio
+  - gemini
+  - grok
 
 # 超时（毫秒）
 timeout:
-  perProvider: 150000    # 每个 AI 的最长等待
+  perProvider: 300000    # 每个 AI 的最长等待
 
 # 重试：单个 AI 失败（超时/空回答）后自动重试次数
 retry: 3

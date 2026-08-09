@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * doctor.js — 环境检查：Chrome CDP 可达性 + 6 个站点 tab 状态。
+ * doctor.js — 环境检查：Chrome CDP 可达性 + 7 个站点 tab 状态。
  *
  * 用法: npm run doctor
  */
@@ -10,12 +10,13 @@ const { chromium } = require('playwright-core');
 const { CDP_URL, ensureChromeCdp, probe } = require('./lib/cdp');
 
 const SITES = [
-    { name: 'Qwen',      url: 'https://chat.qwen.ai/' },
-    { name: 'DeepSeek',  url: 'https://chat.deepseek.com/' },
-    { name: 'Kimi',      url: 'https://www.kimi.com/' },
-    { name: 'Doubao',    url: 'https://www.doubao.com/chat/' },
-    { name: 'ChatGPT',   url: 'https://chatgpt.com/' },
-    { name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat' },
+    { name: 'Qwen',     url: 'https://chat.qwen.ai/' },
+    { name: 'DeepSeek', url: 'https://chat.deepseek.com/' },
+    { name: 'Kimi',     url: 'https://www.kimi.com/' },
+    { name: 'Doubao',   url: 'https://www.doubao.com/chat/' },
+    { name: 'ChatGPT',  url: 'https://chatgpt.com/' },
+    { name: 'Gemini',   url: 'https://gemini.google.com/app' },
+    { name: 'Grok',     url: 'https://grok.com/' },
 ];
 
 async function main() {

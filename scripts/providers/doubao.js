@@ -26,7 +26,8 @@ module.exports = {
         '[class*="markdown"]',
     ],
     stabilityWindow: 10000,
-    minResponseLength: 10,
+    // 单字/短答案（如"北京"）可能很短，minLength 太高会把短答案当没回复等满超时
+    minResponseLength: 2,
     // 选择"专家模式"（专家研究级专业问答 - 2.1 Turbo）
     // 2026-08 实测：必须用 Playwright 原生 click（真实指针事件）才会弹下拉，程序化 el.click() 无效。
     // 并行时页面加载慢：一律先等元素渲染再点；自校验模式按钮文本，未生效返回 false 让 engine 重试。

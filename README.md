@@ -52,11 +52,12 @@ Claude Code 补充上下文
 |------|-----|---------|
 | 主持人 / 整合 | Claude Code（主 Agent） | 上下文理解、方案整合、生成决策文档 |
 | 专家 | ChatGPT | 强通用推理、复杂问题分析 |
-| 专家 | Gemini AI Studio | Google 生态、搜索增强能力 |
+| 专家 | Gemini | Google 生态、搜索增强能力 |
 | 专家 | Qwen | 中文理解、工程实践 |
 | 专家 | DeepSeek | 技术分析、代码能力 |
 | 专家 | Kimi | 长文本理解、资料整理 |
 | 专家 | Doubao | 中文场景、字节生态、产品迭代速度 |
+| 专家 | Grok | xAI 生态、深度推理、风格直接 |
 
 ---
 
@@ -84,7 +85,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 考虑类型支持 / 长期维护 / 团队协作 / 生态风险，给出最终推荐。
 ```
 
-这样多个 AI 回答的是**同一个真实问题**，而不是各自脑补——这正是多 AI 方案区别于「把问题复制粘贴给 6 个 AI」的核心。
+这样多个 AI 回答的是**同一个真实问题**，而不是各自脑补——这正是多 AI 方案区别于「把问题复制粘贴给 7 个 AI」的核心。
 
 ---
 
@@ -114,18 +115,19 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 
 ## 🧩 为什么是这几个 AI？
 
-不是「最强六个」，而是一组**能力方向互补的平衡型 AI Panel**。选择综合权衡了：模型能力 / 免费可用性 / 网页端能力 / 搜索能力 / 中文表现 / 长文本能力 / 稳定性 / 用户覆盖。
+不是「最强七个」，而是一组**能力方向互补的平衡型 AI Panel**。选择综合权衡了：模型能力 / 免费可用性 / 网页端能力 / 搜索能力 / 中文表现 / 长文本能力 / 稳定性 / 用户覆盖。
 
 | AI | 选它而不是别的 |
 |----|---------------|
 | ChatGPT | 综合推理强、生态成熟 |
-| Gemini AI Studio | Google 搜索生态、长上下文、多模态 |
+| Gemini | Google 搜索生态、长上下文、多模态 |
 | Kimi | 长文本、中文资料处理 |
 | DeepSeek | 技术问题、编程分析、推理成本优势 |
 | Qwen | 中文能力、阿里生态 |
 | Doubao | 中文场景、字节生态、迭代快 |
+| Grok | xAI 深度推理、实时信息、风格直接 |
 
-> 这六个不是唯一选择，而是经过综合权衡的一组组合。随时可在 `config.yml` 里自由增删。
+> 这些不是唯一选择，而是经过综合权衡的一组组合。随时可在 `config.yml` 里自由增删。
 
 ---
 
@@ -186,10 +188,10 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
                │  Playwright-core over CDP
 ┌──────────────▼───────────────┐
 │        共享 Chrome            │  http://127.0.0.1:9222
-│    （已登录 6 个站点）          │
+│    （已登录 7 个站点）          │
 └──────┬────┬────┬────┬────┬───┘
        ▼    ▼    ▼    ▼    ▼
-    Qwen DeepSeek Kimi Doubao ChatGPT · AI Studio
+    Qwen DeepSeek Kimi Doubao ChatGPT Gemini · Grok
 ```
 
 单个 AI 的问答管线（`lib/engine.js`）：
@@ -208,8 +210,9 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 | Qwen | 网页搜索 | 「+」菜单 → 更多 → 网页搜索；思考模式默认已开启，无需处理 |
 | DeepSeek | 专家模式 | 空对话态三选一（快速 / 专家 / 识图），需在会话开始前设置 |
 | Doubao | 专家模式 | 专家研究级专业问答（2.1 Turbo） |
-| AI Studio | 联网搜索（Grounding） | 模型 Gemini 3.1 Pro 由 URL 直接指定，开启 Google 搜索增强 |
+| Gemini | 扩展思考 | 模式选择器 →「扩展思考」（Pro + Extended Thinking），不跨会话持久化每次重开；回答前的"Gemini 说"前缀由 postResponseHook 剥离 |
 | Kimi | 无需设置 | 开箱即用，默认即长文本模式 |
+| Grok | 无需设置 | 默认 Fast 模型，开箱即用 |
 
 **机器契约**（脚本与上层 agent 的约定）：
 
@@ -238,7 +241,7 @@ npm install
 # 2. 复制配置模板并按需修改
 cp .env.example .env
 
-# 3. 打开 6 个站点 → 在弹出的 Chrome 里手动登录一次（以后永久复用）
+# 3. 打开 7 个站点 → 在弹出的 Chrome 里手动登录一次（以后永久复用）
 npm run login
 
 # 4. 环境体检（CDP 可达性 + 各站点 tab 状态）
@@ -246,7 +249,7 @@ npm run doctor
 ```
 
 ```bash
-# 单问：按降级链自动尝试（chatgpt → qwen → kimi → deepseek → doubao → aistudio）
+# 单问：按降级链自动尝试（chatgpt → grok → qwen → kimi → deepseek → doubao → gemini）
 npm run ask -- "React 19 和 Vue 3.5 怎么选？"
 
 # 指定某个 AI
@@ -255,7 +258,7 @@ npm run ask -- --from=Kimi "如何用 CSS 实现毛玻璃效果？"
 # 大段内容 / 文件内容走 stdin
 node scripts/ask.js < question.txt
 
-# 6 路并行：同一问题同时问 6 个 AI，答案落盘
+# 7 路并行：同一问题同时问 7 个 AI，答案落盘
 npm run multi-ai-chat -- "对比 Rust 和 Go 做 CLI 工具的优缺点"
 ```
 
@@ -272,7 +275,7 @@ npm run multi-ai-chat -- "对比 Rust 和 Go 做 CLI 工具的优缺点"
 `config.yml`：
 
 ```yaml
-providers: [qwen, deepseek, kimi, doubao, chatgpt, aistudio]  # 并行列表
+providers: [qwen, deepseek, kimi, doubao, chatgpt, gemini, grok]  # 并行列表
 timeout:
   perProvider: 150000    # 单个 AI 最长等待（毫秒）
 retry: 3                 # 单个 AI 失败后自动重试次数
@@ -291,10 +294,10 @@ multi-ai-chat-skill/
 │   │   ├── config.js       # config.yml 加载
 │   │   ├── receipt.js      # 机器可验证回执 [receipt] AGENTCHAT_RUN {...}
 │   │   └── terminal.js     # stderr 日志
-│   ├── providers/          # 6 个 AI 的驱动配置（选择器/延迟/模式/后处理）
-│   ├── multi-ai-chat.js    # 6 路并行派发（流程入口）
+│   ├── providers/          # 7 个 AI 的驱动配置（选择器/延迟/模式/后处理）
+│   ├── multi-ai-chat.js    # 7 路并行派发（流程入口）
 │   ├── ask.js              # 单问（降级链）
-│   ├── login.js            # 打开 6 站点供手动登录（幂等）
+│   ├── login.js            # 打开 7 站点供手动登录（幂等）
 │   └── doctor.js           # 环境体检
 ├── answers/                # AI 原始回答落盘（<时间戳>/raw/）
 ├── config.yml              # 并行 AI 列表 / 超时 / 重试
