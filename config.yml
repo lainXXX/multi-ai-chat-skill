@@ -14,7 +14,7 @@ providers:
 
 # 超时（毫秒）
 timeout:
-  perProvider: 300000    # 每个 AI 的最长等待
+  perProvider: 600000    # 每个 AI 的最长等待
 
 # 重试：单个 AI 失败（超时/空回答）后自动重试次数
 retry: 3

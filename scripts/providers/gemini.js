@@ -34,18 +34,27 @@ module.exports = {
     stillGeneratingPattern: /Defining|立即回答|Answer now/i,
     // research 完成的完整回答带 "Gemini 说\n\n" 前缀，剥离后即为纯答案。
     postResponseHook: async (_p, t) => t.replace(/^Gemini\s*说\s*\n*\s*/i, '').trim(),
-    // 开启"扩展思考"（账户默认模型已是 Pro；扩展思考不跨会话持久化，每次需重开）。
-    // 2026-08 实测：模式选择器按钮 aria-label = "打开模式选择器，当前模式为'Pro'"，
-    // 开启后变为 "当前模式为'Pro 扩展'"（用是否含"扩展"自检）；面板里"扩展思考"是叶子项。
+    // 模式设置（2026-08 实测）：
+    //   1) 账户默认模型是 Flash-Lite（不是 Pro），必须先显式切到"3.1 Pro"。
+    //   2) 再开启"扩展思考"（不跨会话持久化，每次需重开）。
+    // 模式选择器按钮 aria-label = "打开模式选择器，当前模式为'X'"；面板里模型/模式
+    // 都是 [class*="label-container"] 卡片（"3.1 Pro 高阶数学与代码" / "扩展思考 擅长解决复杂问题"）。
     // 页面加载有时停在欢迎态导致 picker 未渲染 → 先轮询等 picker 出现，仍失败返回 false 由 engine 重试。
     setupMode: async (page) => {
-        const isExtOn = () =>
+        const label = () =>
             page.evaluate(() => {
                 const btn = document.querySelector('[aria-label*="模式选择器"]');
-                return !!(btn && /扩展/.test(btn.getAttribute('aria-label') || ''));
-            }).catch(() => false);
+                return btn ? btn.getAttribute('aria-label') : null;
+            }).catch(() => null);
 
-        if (await isExtOn()) return true;
+        const isProOn = async () => {
+            const l = await label();
+            return !!l && /Pro/.test(l) && !/Flash/.test(l);
+        };
+        const isExtOn = async () => {
+            const l = await label();
+            return !!l && /扩展/.test(l);
+        };
 
         // 等 picker 渲染（最多 20s；SPA 偶尔停在欢迎态不挂载 composer）
         for (let i = 0; i < 20; i++) {
@@ -54,24 +63,33 @@ module.exports = {
             await page.waitForTimeout(1000);
         }
 
-        // 打开模式选择器
-        await page.evaluate(() => {
-            const btn = document.querySelector('[aria-label*="模式选择器"]');
-            if (btn) btn.click();
-        }).catch(() => {});
-        await page.waitForTimeout(1500);
+        const openPicker = async () => {
+            await page.evaluate(() => { const b = document.querySelector('[aria-label*="模式选择器"]'); if (b) b.click(); }).catch(() => {});
+            await page.waitForTimeout(1500);
+        };
+        const pickCard = async (text) => {
+            const el = page.locator(`[class*="label-container"]:has-text("${text}")`).first();
+            await el.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+            await el.click({ timeout: 5000 }).catch(() => {});
+            await page.waitForTimeout(1500);
+        };
+        const closePicker = async () => {
+            await page.keyboard.press('Escape').catch(() => {});
+            await page.waitForTimeout(800);
+        };
 
-        // 点"扩展思考"选项（叶子文本，取最近可点击祖先）
-        await page.evaluate(() => {
-            const el = [...document.querySelectorAll('*')].find((e) => /^扩展思考/.test((e.textContent || '').trim()) && e.childElementCount === 0 && e.offsetParent !== null);
-            if (el) (el.closest('button,[role="button"],mat-option') || el).click();
-        }).catch(() => {});
-        await page.waitForTimeout(1500);
-
-        // 关闭面板，别挡住输入框
-        await page.keyboard.press('Escape').catch(() => {});
-        await page.waitForTimeout(800);
-
-        return isExtOn();
+        // 1) 切到 3.1 Pro（默认可能是 Flash-Lite）
+        if (!(await isProOn())) {
+            await openPicker();
+            await pickCard('3.1 Pro');
+            await closePicker();
+        }
+        // 2) 开启"扩展思考"
+        if (!(await isExtOn())) {
+            await openPicker();
+            await pickCard('扩展思考');
+            await closePicker();
+        }
+        return (await isProOn()) && (await isExtOn());
     },
 };

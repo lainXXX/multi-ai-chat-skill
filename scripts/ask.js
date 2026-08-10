@@ -48,7 +48,7 @@ async function main() {
     let last = null;
     for (const cfg of providers) {
         log('ask', `尝试 ${cfg.name}...`);
-        const r = await drive(cfg, prompt, { timeout });
+        const r = await drive(cfg, prompt, { timeout: cfg.timeout || timeout });
         last = r;
         if (r.success) {
             emitReceipt({ skill: 'web-ai-chat/ask', runId: makeRunId(), fields: { provider_used: cfg.key, exit: 0, elapsed_ms: Date.now() - start }, stream: 'stderr' });

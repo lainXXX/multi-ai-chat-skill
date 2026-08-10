@@ -24,13 +24,20 @@ module.exports = {
     ],
     sendFallback: 'Enter',
     responseSelectors: [
-        '.markdown',
+        // 整轮回复容器（含思考/搜索过程），比 .markdown 稳：大回复若渲染成多个
+        // .markdown 片段，.last() 只拿到最后一段会截断。
         '[data-message-author-role="assistant"]',
+        '.markdown',
         '.agent-turn',
         '[class*="response"]',
     ],
     stabilityWindow: 10000,
     minResponseLength: 5,
+    // 仍在生成时 ChatGPT 显示 stop 按钮（[data-testid="stop-button"]），生成结束即消失。
+    // 并行 6 进程共享一个 Chrome 时流式会暂停 10s+，仅靠文本稳定窗口会把半成品当完成
+    // （实测曾截断到 4 条/119 字符）。stop 按钮在 → 重置稳定性时钟，等真正结束。
+    stillGeneratingCheck: async (page) =>
+        page.locator('[data-testid="stop-button"]').count().then((n) => n > 0).catch(() => false),
     // 开启"网页搜索"（2026-08 实测：新对话页输入区上方有建议 chip "搜索网页"，点击后该 chip
     // 移入编辑器、变 accent 高亮的"网页搜索"，即已启用；启用后建议行消失。自校验 + 失败重载重试。
     // 返回 true=已开启 / false=未生效（engine 据此重试）。

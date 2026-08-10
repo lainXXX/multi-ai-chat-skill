@@ -1,6 +1,6 @@
 ---
 name: multi-ai-chat-skill
-description: Multi AI Research → Decision → Solution Generator。用户要的是一份可执行的决策/方案文档时用本技能：把问题并行分发给多个网页 AI 作答，再由主 agent 提炼成 AI Decision & Solution Document（不是 AI 回答汇总）。触发场景：技术选型/架构/产品/商业决策、写方案/出方案、头脑风暴/新产品设计、新框架/新概念学习、对比几个选项选哪个。
+description: Multi AI Research → Decision → Solution Generator。用户要的是一份可执行的决策/方案文档时用本技能：把问题并行分发给多个网页 AI 作答，再由主 agent 提炼成 AI Decision & Solution Document（不是 AI 回答汇总）。触发场景：技术选型/架构/产品/商业决策、写方案/出方案、头脑风暴/新产品设计、新框架/新概念学习、对比几个选项选哪个。不适用：单 AI 快速一问、只要并行原始回答不要合成文档、纯总结归纳、常规问答——不涉及"多个网页 AI 并行 + 合成决策文档"时不需本技能。
 ---
 
 # multi-ai-chat-skill — 多 AI 研究 → 决策 → 方案文档
@@ -37,6 +37,7 @@ description: Multi AI Research → Decision → Solution Generator。用户要�
 node scripts/multi-ai-chat.js "<问题>"
 ```
 
+- 运行前提：脚本通过共享 Chrome 的 CDP 连接各 AI 站点，端口没开时会自动拉起调试 Chrome（复用登录态）。若某路全部失败，按下方规则如实记录即可，不必中断——继续提炼可用的部分。
 - 行为由 `config.yml` 配置：`providers`（并行几个）/ `timeout.perProvider`（超时）/ `retry`（重试）。
 - stdout 是机器契约 JSON（诊断与回执走 stderr）：`{ ok_count, elapsed_ms, answers_dir, results[], receipt }`，每路含 `key/name/ok/chars/file/receipt`。
 - 某路 `ok:false`：如实记录，禁止伪造；最终文档的回执表必须体现失败。
@@ -130,6 +131,11 @@ node scripts/multi-ai-chat.js "<问题>"
 | DeepSeek | ✓ |
 | Qwen | ✓ |
 ```
+
+**完成判定（输出前自检，全部满足才交付）**：
+- ① 结论一句话可复述，不再依赖任何 AI 原文
+- ② Executive Summary / Final Recommendation / Alternatives / Risks / 回执表 五项齐全
+- ③ 无"AI1 认为…AI2 认为…"式转述，观点已提炼为最终立场
 
 ## 可选：Decision Log（重大决策时追加）
 

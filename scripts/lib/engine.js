@@ -120,6 +120,13 @@ async function waitAndExtract(page, responseSelectors, opts = {}) {
         if (opts.stillGeneratingPattern && opts.stillGeneratingPattern.test(lastText)) {
             lastChange = Date.now();
         }
+        // DOM 级"仍在生成"信号（如 ChatGPT 的 stop 按钮）：返回 true 时同样重置时钟。
+        // 文本模式抓不住"流式暂停但还没结束"（并行负载高时暂停可超 10s），DOM 标记更可靠。
+        if (opts.stillGeneratingCheck) {
+            try {
+                if (await opts.stillGeneratingCheck(page, el)) lastChange = Date.now();
+            } catch (_) { /* 检查失败不阻塞 */ }
+        }
         if (leftBaseline && lastText.length >= minLen && Date.now() - lastChange >= stability) break;
     }
     return lastText.length >= minLen ? lastText : null;
@@ -206,6 +213,13 @@ async function drive(cfg, prompt, opts = {}) {
         const refusalPattern = /我的知识(截止|只到|停留|库|范围)|我[^。；;]{0,8}无法(提供|回答|获取|访问)/;
         if (refusalPattern.test(norm(text))) {
             return { success: false, reason: 'no_response', detail: 'AI 拒答/知识截止: ' + norm(text).slice(0, 50) };
+        }
+
+        // 生成未完成兜底：最终文本仍命中 cfg.incompletePattern（如"跳过"按钮、仍在执行代码等
+        // 生成中标记）→ 说明拿到的是半成品而非完整答案，判 no_response 交给上层重试，
+        // 避免把检索过程/半句回答当研究结果落盘。
+        if (cfg.incompletePattern && cfg.incompletePattern.test(text)) {
+            return { success: false, reason: 'no_response', detail: '回答未生成完（命中生成中标记）' };
         }
 
         const out = cfg.postResponseHook ? await cfg.postResponseHook(page, text) : text;
