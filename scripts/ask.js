@@ -58,6 +58,13 @@ async function main() {
             return;
         }
         log('ask', `✗ ${cfg.name}: ${r.reason}${r.detail ? ' — ' + String(r.detail).slice(0, 100) : ''}`);
+        // 拒答/服务提示（refused）是永久性失败，同 prompt 重试无意义 → exit 3，让调用方不重试。
+        // 仅 --only 单 provider 时生效；fallback 链模式下继续尝试下一个 provider。
+        if (r.reason === 'refused' && providers.length === 1) {
+            emitReceipt({ skill: 'web-ai-chat/ask', runId: makeRunId(), fields: { provider_used: cfg.key, exit: 3, reason: 'refused', elapsed_ms: Date.now() - start }, stream: 'stderr' });
+            setTimeout(() => process.exit(3), 100);
+            return;
+        }
     }
 
     emitReceipt({ skill: 'web-ai-chat/ask', runId: makeRunId(), fields: { provider_used: null, exit: 9, reason: last && last.reason, elapsed_ms: Date.now() - start }, stream: 'stderr' });

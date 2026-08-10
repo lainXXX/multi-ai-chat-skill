@@ -47,11 +47,18 @@ function runOne(cfg, prompt, outDir, idx = 0) {
             child.stderr.on('data', (d) => { stderr += d; });
             child.on('close', (code) => {
                 const ok = code === 0 && stdout.trim().length > 0;
+                const file = path.join(outDir, `${cfg.key}.md`);
+                // 拒答/服务提示（exit 3）：永久性失败，同 prompt 重试无意义，立即判失败，
+                // 避免对额度/拒答提示重复烧时间（如 Doubao 额度用尽时不再 4 次重试）。
+                if (code === 3) {
+                    try { fs.writeFileSync(file, stdout.trim()); } catch (_) {}
+                    log('multi-ai-chat', `✗ ${cfg.name}: 拒答/服务提示（不重试）`);
+                    return resolve({ key: cfg.key, name: cfg.name, ok: false, chars: 0, file: path.basename(file), receipt: null, exit: 3 });
+                }
                 if (!ok && n < MAX_ATTEMPTS) {
                     log('multi-ai-chat', `✗ ${cfg.name}: 尝试${n}失败（exit ${code}），重试...`);
                     return attempt(n + 1);
                 }
-                const file = path.join(outDir, `${cfg.key}.md`);
                 try { fs.writeFileSync(file, stdout.trim()); } catch (_) {}
                 const m = stderr.match(/\[receipt\] AGENTCHAT_RUN .*/);
                 const receipt = m ? m[m.length - 1].trim() : null;
@@ -77,7 +84,7 @@ async function main() {
     }
 
     // 每次运行一个文件夹：answers/<时间戳>/raw/<provider>.md
-    // 主 agent 稍后把总结写进 answers/<时间戳>/synthesis.md
+    // 最终决策文档由主 agent 写到当前工作目录（见 SKILL.md）；answers/ 只存 AI 原始回答。
     const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     const runDir = path.join(path.resolve(__dirname, '..', 'answers'), ts);
     const rawDir = path.join(runDir, 'raw');

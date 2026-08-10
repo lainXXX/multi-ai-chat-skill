@@ -29,11 +29,20 @@ module.exports = {
     minResponseLength: 2,
     // 扩展思考/研究模式下 model-response 容器出现得晚，挂载等待放宽到 90s
     responseAttachTimeout: 90000,
-    // 2026-08 实测：账户默认进 research mode，回答前 model-response 先显示
-    // "Defining ..." 规划头 + "立即回答" 按钮；匹配这些时重置稳定性时钟，等真实回答。
-    stillGeneratingPattern: /Defining|立即回答|Answer now/i,
+    // 2026-08 实测：账户默认进 research mode，回答前 model-response 依次显示
+    // "Defining ..." 规划头 → "Evaluating Resource Usage" → "立即回答" 按钮；
+    // 匹配这些状态词时重置稳定性时钟，等真实回答（缺词会让状态文本被当答案，见 incompletePattern）。
+    stillGeneratingPattern: /Defining|Evaluating|Searching|Generating|Reviewing|立即回答|Answer now|Thinking/i,
+    // 兜底：若最终拿到的"回答"仍命中生成中状态词（如 research 卡在 Evaluating），
+    // 判 no_response 交给上层重试，避免把状态文本当研究结果落盘（2026-08 实测假成功）。
+    incompletePattern: /Evaluating Resource Usage|Defining|立即回答|Answer now/i,
     // research 完成的完整回答带 "Gemini 说\n\n" 前缀，剥离后即为纯答案。
-    postResponseHook: async (_p, t) => t.replace(/^Gemini\s*说\s*\n*\s*/i, '').trim(),
+    // 另外 Gemini 网页版在回答末尾渲染 follow-up 建议按钮（如"要探讨…吗？\n是"），
+    // innerText 会把按钮文本带进 raw —— 剥离结尾的"问题行 + 单字应答"块。
+    postResponseHook: async (_p, t) => t
+        .replace(/^Gemini\s*说\s*\n*\s*/i, '')
+        .replace(/([\r\n]+[^\r\n]{1,80}吗[？?][\r\n]+\s*(?:是|好的|好|否|可以)\s*)$/, '')
+        .trim(),
     // 模式设置（2026-08 实测）：
     //   1) 账户默认模型是 Flash-Lite（不是 Pro），必须先显式切到"3.1 Pro"。
     //   2) 再开启"扩展思考"（不跨会话持久化，每次需重开）。

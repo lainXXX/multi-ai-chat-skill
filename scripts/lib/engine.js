@@ -102,13 +102,20 @@ async function waitAndExtract(page, responseSelectors, opts = {}) {
     }
     if (!el) return null;
 
-    let lastText = '', lastChange = Date.now();
+    let lastText = '', lastChange = Date.now(), lastTextChange = Date.now();
     let leftBaseline = baseline === null; // 无基线 = 无需偏离，行为同旧版
+    // maxGenerateHoldMs：DOM 生成中信号（stillGeneratingCheck，如 ChatGPT 的 stop 按钮）
+    // 对稳定性时钟的续期上限。该信号本应随生成完成消失；若回复文本已稳定超此时长仍持续
+    // 命中，视为过期残留（实测 stop 按钮残留会让每次问答等满超时 ~600s）——停止续期，
+    // 按稳定性窗口正常收尾。仅限 DOM 信号；文本占位型（stillGeneratingPattern，如
+    // "正在思考"）不受限——占位稳定 = 确实没生成完，仍继续等真实回答。
+    const maxHold = opts.maxGenerateHoldMs ?? 45000;
     while (Date.now() - start < timeout) {
         await page.waitForTimeout(2000);
         const t = String(await el.innerText().catch(() => lastText) || '').trim();
         if (t !== lastText) {
             lastText = t;
+            lastTextChange = Date.now();
             if (!leftBaseline) {
                 if (t !== baseline) { leftBaseline = true; lastChange = Date.now(); }
                 // 仍停留在旧会话的旧消息 → 不重置时钟，等新回复出现
@@ -122,7 +129,7 @@ async function waitAndExtract(page, responseSelectors, opts = {}) {
         }
         // DOM 级"仍在生成"信号（如 ChatGPT 的 stop 按钮）：返回 true 时同样重置时钟。
         // 文本模式抓不住"流式暂停但还没结束"（并行负载高时暂停可超 10s），DOM 标记更可靠。
-        if (opts.stillGeneratingCheck) {
+        if (opts.stillGeneratingCheck && Date.now() - lastTextChange <= maxHold) {
             try {
                 if (await opts.stillGeneratingCheck(page, el)) lastChange = Date.now();
             } catch (_) { /* 检查失败不阻塞 */ }
@@ -208,11 +215,15 @@ async function drive(cfg, prompt, opts = {}) {
             return { success: false, reason: 'no_response', detail: '提取到的是用户问题本身（选择器误匹配用户气泡）' };
         }
 
-        // 拒答兜底：AI 明确表示知识截止/无法提供（第一人称拒绝）时不视为有效研究结果，
-        // 判 no_response 交给上层重试，避免把拒答当研究内容落盘（如 DeepSeek 偶尔拒搜）。
-        const refusalPattern = /我的知识(截止|只到|停留|库|范围)|我[^。；;]{0,8}无法(提供|回答|获取|访问)/;
-        if (refusalPattern.test(norm(text))) {
-            return { success: false, reason: 'no_response', detail: 'AI 拒答/知识截止: ' + norm(text).slice(0, 50) };
+        // 拒答/不可用兜底：AI 明确拒答、知识截止或服务提示（如额度用尽）不视为有效研究结果，
+        // 判 refused 交给上层（不重试）避免把非回答当研究内容落盘。通用模式 + 各 provider 自有
+        // cfg.refusalPattern（如 Doubao 额度提示）取并集。
+        const refusalPatterns = [
+            /(我的知识(截止|只到|停留|库|范围)|我[^。；;]{0,8}无法(提供|回答|获取|访问))/,
+            ...(cfg.refusalPattern ? [cfg.refusalPattern] : []),
+        ];
+        if (refusalPatterns.some((p) => p.test(norm(text)))) {
+            return { success: false, reason: 'refused', detail: 'AI 拒答/服务提示: ' + norm(text).slice(0, 50) };
         }
 
         // 生成未完成兜底：最终文本仍命中 cfg.incompletePattern（如"跳过"按钮、仍在执行代码等
