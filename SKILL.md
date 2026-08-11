@@ -1,6 +1,6 @@
 ---
 name: multi-ai-chat-skill
-description: Multi AI Research → Decision → Solution Generator。用户要的是一份可执行的决策/方案文档时用本技能：把问题并行分发给多个网页 AI 作答，再由主 agent 提炼成 AI Decision & Solution Document（不是 AI 回答汇总）。触发场景：技术选型/架构/产品/商业决策、写方案/出方案、头脑风暴/新产品设计、新框架/新概念学习、对比几个选项选哪个。不适用：单 AI 快速一问、只要并行原始回答不要合成文档、纯总结归纳、常规问答、涉及本技能自身（评估/编写/优化 skill）——不涉及"多个网页 AI 并行 + 合成决策文档"时不需本技能。
+description: Multi AI Research → Decision → Solution Generator。用户要的是一份可执行的决策/方案文档时用本技能：把问题并行分发给多个网页 AI 作答，再由主 agent 提炼成 AI Decision & Solution Document（不是 AI 回答汇总）。触发场景：技术选型/架构/产品/商业决策、需要多视角研究后形成方案决策、写方案/出方案、头脑风暴/新产品设计、新框架/新概念的系统性学习、对比几个选项选哪个。不适用：单 AI 快速一问、只要并行原始回答不要合成文档、纯总结归纳、常规问答、单次技术问答、代码 debug、简单事实/概念解释（已有明确答案只需解释时）、涉及本技能自身（评估/编写/优化 skill）——不涉及"多个网页 AI 并行 + 合成决策文档"时不需本技能。
 ---
 
 # multi-ai-chat-skill — 多 AI 研究 → 决策 → 方案文档
@@ -33,20 +33,26 @@ description: Multi AI Research → Decision → Solution Generator。用户要�
 
 ### 2. 调用对话脚本
 
+**默认用 stdin 传参**（把问题写入临时文件后 `<` 重定向），避免 shell 对引号/反引号/$ 的转义破坏命令；仅无特殊字符的短问题才可直接用命令行参数：
+
 ```bash
-node scripts/multi-ai-chat.js "<问题>"
+node scripts/multi-ai-chat.js < 问题.txt
+# 或：node scripts/multi-ai-chat.js "<短问题>"
 ```
 
 - 运行前提：脚本通过共享 Chrome 的 CDP 连接各 AI 站点，端口没开时会自动拉起调试 Chrome（复用登录态）。若某路全部失败，按下方规则如实记录即可，不必中断——继续提炼可用的部分。
-- 行为由 `config.yml` 配置：`providers`（并行几个）/ `timeout.perProvider`（超时）/ `retry`（重试）。
-- stdout 是机器契约 JSON（诊断与回执走 stderr）：`{ ok_count, elapsed_ms, answers_dir, results[], receipt }`，每路含 `key/name/ok/chars/file/receipt`。
+- 行为由 `config.yml` 配置：`providers`（并行几个）/ `timeout.perProvider`（超时）/ `retry`（重试）/ `min_providers_ok`（降级阈值）。
+- stdout 是机器契约 JSON（诊断与回执走 stderr）：`{ ok_count, total, decision, answers_dir, manifest, results[], receipt }`，每路含 `key/name/ok/status/chars/preview/file/receipt`。
 - 某路 `ok:false`：如实记录，禁止伪造；最终文档的回执表必须体现失败。
-- 问题含引号等特殊字符时改用 stdin 传参（脚本支持）：把问题写入文件后 `node scripts/multi-ai-chat.js < 问题.txt`，避免 shell 引号转义破坏命令。
 
-### 3. 主 agent 回收
-读 `answers/<时间戳>/raw/<provider>.md`。**只提炼关键洞察，不要复制全文**（契约见核心定位）——AI 原始回答留在 `raw/`，不污染最终文档。
+### 3. 主 agent 回收（先 manifest，后按需读 raw）
+
+1. **先读 `answers/<时间戳>/manifest.json`**：它列出每路 `status / chars / preview（前 240 字符）`。**严禁一次性 cat 全部 raw 文件**——7 份原文可达 20k+ tokens，全读会挤爆上下文。
+2. 只对 `status: ok` 且 preview 显示有实质内容的回答读 `raw/<provider>.md` 全文；`suspicious/blocked/failed` 只读 preview，不读全文。
+3. 提炼时只摘关键洞察，不复制全文（契约见核心定位）——AI 原始回答留在 `raw/`，不污染最终文档。
 
 ### 4. 主 agent 提炼
+
 从多份回答中提炼：
 - 被采用的方案与理由（Final Recommendation 的依据）
 - 每个 AI 独特且有价值的洞察
@@ -54,106 +60,21 @@ node scripts/multi-ai-chat.js "<问题>"
 - 风险与取舍
 
 ### 5. 生成决策文档
-按下面的强制格式写成 **AI Decision & Solution Document**，保存到**当前工作目录**（你启动 Claude 的目录，即 CWD/`process.cwd()`）下的 `<简洁需求>.md`——不要写进 skill 目录。`answers/<时间戳>/` 只放 AI 原始回答，不是最终交付物。
 
-## 合成格式（强制）
+按 `references/decision-format.md` 的 9 章节模板写成 **AI Decision & Solution Document**，保存到**当前工作目录**（CWD/`process.cwd()`）下，**文件名加日期后缀**防止覆盖上轮产物：`<简洁需求>_<YYYYMMDD>.md`。不要写进 skill 目录。`answers/<时间戳>/` 只放 AI 原始回答与 manifest，不是最终交付物。
 
-```markdown
-# <主题>
+## 降级与可信度（按 ok 路数）
 
-> AI 辅助生成方案文档
-> 日期：<日期>
-> 参与分析模型：<N 个 AI 名称>
-> 状态：Draft / Final
+读 stdout 契约的 `ok_count` / `decision`，按 `min_providers_ok`（config.yml，默认 3）降级：
 
-# 1. Executive Summary（结论摘要）
-一句话说明最终结论。例：采用 Zustand 作状态管理，保留 React Query 处理服务端状态。
+| ok 路数 | decision | 行为 |
+|---------|----------|------|
+| ≥ min_providers_ok | `full` | 生成完整 9 章决策文档 |
+| 1 ~ min-1 | `partial` | 只出初步分析（背景 + 要点），Confidence ≤ 3 星，并注明"证据有限" |
+| 0 | `insufficient` | 输出"证据不足，不建议行动"，不放 Final Recommendation |
 
-# 2. Background（背景）
-
-## 当前情况
-- 为什么提出这个问题 / 现状 / 约束
-
-## 目标
-- 希望达到什么
-
-## 非目标
-- 明确不解决什么
-
-# 3. Final Recommendation（最终方案）
-
-## 3.1 总体方案
-写最终选择。不要写"AI1 认为…AI2 认为…"，而是"推荐采用 XXX，因为…"。
-
-## 3.2 详细设计
-### 架构 / ### 流程 / ### 技术细节（代码、配置）
-
-# 4. Implementation Plan（实施计划）
-
-## Phase 1
-时间：/ 任务：
-## Phase 2
-时间：/ 任务：
-
-# 5. Alternatives Considered（备选方案）
-
-| 方案 | 结论 | 原因 |
-|------|------|------|
-| A | 放弃 | 原因 |
-
-# 6. Risks & Trade-offs（风险与取舍）
-
-风险：
--
-解决：
--
-
-# 7. AI Research Notes（AI 分析依据）
-
-> 保留关键洞察，不是完整回答。
-
-## <AI 名称>
-关键观点：
--
-
-## <AI 名称>
-关键观点：
--
-
-# 8. Confidence Level（可信度）
-
-最终方案可信度：⭐⭐⭐⭐☆
-原因：多模型一致 / 有实践验证 / 存在 XX 风险
-
-# 9. Execution Receipt
-
-| AI | 状态 |
-|----|------|
-| DeepSeek | ✓ |
-| Qwen | ✓ |
-```
-
-**完成判定（输出前自检，全部满足才交付）**：
-- ① 结论一句话可复述，不再依赖任何 AI 原文
-- ② Executive Summary / Final Recommendation / Alternatives / Risks / 回执表 五项齐全
-- ③ 无"AI1 认为…AI2 认为…"式转述，观点已提炼为最终立场
-
-## 可选：Decision Log（重大决策时追加）
-
-```markdown
-# Decision Log
-
-## Decision
-选择了 X 而不是 Y
-
-## Why
-1. 原因
-
-## Revisit Condition
-满足以下条件时重新评估：
-- 数据规模超过 …
-- 指标超过 …
-```
+- **Confidence Level 自动校准**：星级绑定 `ok_count / total` 比率，不凭感觉给。ok 比例 ≥ 80% → 4-5 星；50-80% → 3 星；< 50% → ≤ 2 星。
+- 单源证据（只有 1 路 ok）必须在文档中标注"单源证据"。
 
 ## 关键约定
 

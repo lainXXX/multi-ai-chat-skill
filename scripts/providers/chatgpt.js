@@ -31,6 +31,9 @@ module.exports = {
         '.agent-turn',
         '[class*="response"]',
     ],
+    // 每次新回复都会新增一个 assistant 节点（2026-08 实测），可作"消息数增量"校验：
+    // 选择器漂移匹配到静态区域时，发送前后 count 不变 → 判 NO_NEW 可疑。
+    responseCountSelectors: ['[data-message-author-role="assistant"]'],
     stabilityWindow: 10000,
     minResponseLength: 5,
     // 仍在生成时 ChatGPT 显示 stop 按钮（[data-testid="stop-button"]），生成结束即消失。

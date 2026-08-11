@@ -16,6 +16,7 @@
 
 const { chromium } = require('playwright-core');
 const { CDP_URL, ensureChromeCdp } = require('./cdp');
+const { classify, classifyPage, isEcho, PAGE_DOM_SELECTORS } = require('./validate');
 
 function hostnameOf(u) {
     try { return new URL(u).hostname; } catch { return ''; }
@@ -165,6 +166,18 @@ async function drive(cfg, prompt, opts = {}) {
             return { success: false, reason: 'auth', detail: `landed on ${url.slice(0, 90)}` };
         }
 
+        // 页面级风控/验证检查（P0 残余治理）：长验证码页/挑战页无法靠文本长度区分，
+        // 但 URL / document.title / 挑战 DOM 元素特征明确。命中即 blocked（exit 3 不重试），
+        // 避免把风控页长文案当有效回答落盘。
+        const pageSig = await page.evaluate(() => ({ url: location.href, title: document.title })).catch(() => null);
+        const domHits = await page.locator(PAGE_DOM_SELECTORS.join(',')).count().catch(() => 0);
+        if (pageSig) {
+            const pv = classifyPage({ ...pageSig, domHits });
+            if (pv.blocked) {
+                return { success: false, reason: 'blocked', detail: `页面风控/验证（${pv.flag}）: ${String(pageSig.title || pageSig.url).slice(0, 60)}` };
+            }
+        }
+
         // 模式/模型设置（各 provider 的 setupMode：如 DeepSeek 深度思考、ChatGPT 网页搜索）
         // setupMode 返回 false = 未生效 → 重试（cfg.setupModeRetries，默认 2 次）。
         // 并行 6 子进程共享同一 Chrome 时页面加载慢，固定等待常不足，所以必须按
@@ -190,6 +203,13 @@ async function drive(cfg, prompt, opts = {}) {
         // 必须等文本偏离基线才算拿到新回复。
         const baselineText = await currentLastText(page, cfg.responseSelectors);
 
+        // 发送前记录响应容器匹配数：选择器若漂移匹配到静态区域，消息数不会随新回复增加。
+        // 仅 provider 显式配置 responseCountSelectors 才启用（需确认该站点每次新回答都新增节点）。
+        let beforeCount = null;
+        if (cfg.responseCountSelectors) {
+            beforeCount = await page.locator(cfg.responseCountSelectors.join(',')).count().catch(() => null);
+        }
+
         // 输入
         if (!cfg.fillInput) await editor.click({ timeout: 3000 }).catch(() => {});
         await page.waitForTimeout(200);
@@ -204,14 +224,29 @@ async function drive(cfg, prompt, opts = {}) {
 
         // 等待 + 提取
         const text = await waitAndExtract(page, cfg.responseSelectors, { ...cfg, timeout: opts.timeout, baselineText });
-        if (!text) return { success: false, reason: 'no_response' };
+        if (!text) {
+            // 超时拿不到稳定回答时带回现场：页面 URL + 响应容器最后文本（前 120 字符），
+            // 让"网页有输出但脚本 no_response"可诊断（实测 Kimi 并行时疑似中间页/限流页）。
+            const snapshot = await page.evaluate(() => {
+                const sels = ['[class*="chat-content-item-assistant"]', '[class*="segment-content"]', '[class*="assistant"]', '[class*="markdown"]', '[role="textbox"]'];
+                let last = '';
+                for (const s of sels) {
+                    const els = document.querySelectorAll(s);
+                    if (els.length) { last = els[els.length - 1].innerText || last; break; }
+                }
+                return { url: location.href, last };
+            }).catch(() => null);
+            const detail = snapshot
+                ? `url=${snapshot.url.slice(0, 80)} 容器文本=${JSON.stringify(snapshot.last.replace(/\s+/g, ' ').slice(0, 120))}`
+                : '无法读取页面状态';
+            return { success: false, reason: 'no_response', detail };
+        }
 
         // 提取兜底：若拿到的"回复"其实是用户问题本身（选择器误匹配到用户气泡），
         // 视为未拿到回复，交给上层重试，避免把问题当回答落盘。
-        // 用去除所有空白后的规范化文本比较：站点对用户气泡的加空格/换行规范化（如豆包回显）
-        // 会让 trim 精确相等失效，规范化后仍相等即判回显。
-        const norm = (s) => String(s).replace(/\s+/g, '');
-        if (norm(text) === norm(prompt)) {
+        // 用去空白规范化 + bigram 相似度：站点对用户气泡的格式微调（剥序号/加空格换行，
+        // 如豆包回显）会让精确相等失效，相似度 >0.9 仍判回显。
+        if (isEcho(text, prompt)) {
             return { success: false, reason: 'no_response', detail: '提取到的是用户问题本身（选择器误匹配用户气泡）' };
         }
 
@@ -234,7 +269,21 @@ async function drive(cfg, prompt, opts = {}) {
         }
 
         const out = cfg.postResponseHook ? await cfg.postResponseHook(page, text) : text;
-        return { success: true, response: out };
+
+        // 发送后消息数：与发送前对比，未增则提示选择器可能匹配到静态区域（NO_NEW 信号）。
+        let afterCount = null;
+        if (cfg.responseCountSelectors && beforeCount != null) {
+            afterCount = await page.locator(cfg.responseCountSelectors.join(',')).count().catch(() => null);
+        }
+        const noNewMessage = beforeCount != null && afterCount != null && afterCount <= beforeCount;
+
+        // 有效性分类（P0 治理假成功）：blocked=限流/服务错误/页面风控文案（硬失败），
+        // suspicious=与旧会话基线相似、过短或消息数未增（低可信但保留文本，交由上层重试/降级）。
+        const verdict = classify({ text: out, baseline: baselineText, prompt, noNewMessage, cfg });
+        if (verdict.status === 'blocked') {
+            return { success: false, reason: 'blocked', detail: '服务提示/限流文案: ' + out.slice(0, 50) };
+        }
+        return { success: true, response: out, status: verdict.status, flags: verdict.flags };
     } catch (e) {
         return { success: false, reason: 'error', detail: e.message };
     }

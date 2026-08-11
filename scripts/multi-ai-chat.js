@@ -46,24 +46,45 @@ function runOne(cfg, prompt, outDir, idx = 0) {
             child.stdout.on('data', (d) => { stdout += d; });
             child.stderr.on('data', (d) => { stderr += d; });
             child.on('close', (code) => {
-                const ok = code === 0 && stdout.trim().length > 0;
                 const file = path.join(outDir, `${cfg.key}.md`);
-                // 拒答/服务提示（exit 3）：永久性失败，同 prompt 重试无意义，立即判失败，
-                // 避免对额度/拒答提示重复烧时间（如 Doubao 额度用尽时不再 4 次重试）。
+                // 从 stderr 回执解析 status/flags（P0：ok:true 只表示"获得可信回答"）
+                const m = stderr.match(/\[receipt\] AGENTCHAT_RUN .*/);
+                const receipt = m ? m[m.length - 1].trim() : null;
+                let fields = {};
+                if (receipt) { try { fields = JSON.parse(receipt.replace(/^\[receipt\] AGENTCHAT_RUN /, '')); } catch (_) {} }
+                const status = code === 0 ? 'ok' : code === 3 ? 'blocked' : code === 5 ? 'suspicious' : 'failed';
+                const flags = fields.flags || [];
+
+                // preview = 每路回答前 240 字符，供主 agent 先读 manifest 决定是否读全文
+                const preview = stdout.slice(0, 240);
+
+                // 拒答/服务提示（exit 3 = refused/blocked）：永久性失败，同 prompt 重试无意义，
+                // 避免对额度/拒答提示重复烧时间（如 Doubao 额度用尽时不再多次重试）。
                 if (code === 3) {
                     try { fs.writeFileSync(file, stdout.trim()); } catch (_) {}
                     log('multi-ai-chat', `✗ ${cfg.name}: 拒答/服务提示（不重试）`);
-                    return resolve({ key: cfg.key, name: cfg.name, ok: false, chars: 0, file: path.basename(file), receipt: null, exit: 3 });
+                    return resolve({ key: cfg.key, name: cfg.name, ok: false, status, flags, chars: 0, preview, file: path.basename(file), receipt, exit: 3 });
                 }
+
+                // 可疑（exit 5）：低可信，仅重试一次；第二次仍可疑则保留文本按 suspicious 落盘
+                if (code === 5) {
+                    if (n === 1) {
+                        log('multi-ai-chat', `⚠ ${cfg.name}: 回答可疑（${flags.join(',')}），重试一次...`);
+                        return attempt(2);
+                    }
+                    try { fs.writeFileSync(file, stdout.trim()); } catch (_) {}
+                    log('multi-ai-chat', `⚠ ${cfg.name}: 仍可疑（${flags.join(',')}），记低可信`);
+                    return resolve({ key: cfg.key, name: cfg.name, ok: false, status, flags, chars: stdout.length, preview, file: path.basename(file), receipt, exit: 5 });
+                }
+
+                const ok = code === 0 && stdout.trim().length > 0;
                 if (!ok && n < MAX_ATTEMPTS) {
                     log('multi-ai-chat', `✗ ${cfg.name}: 尝试${n}失败（exit ${code}），重试...`);
                     return attempt(n + 1);
                 }
                 try { fs.writeFileSync(file, stdout.trim()); } catch (_) {}
-                const m = stderr.match(/\[receipt\] AGENTCHAT_RUN .*/);
-                const receipt = m ? m[m.length - 1].trim() : null;
                 log('multi-ai-chat', `${ok ? '✓' : '✗'} ${cfg.name}: ${ok ? stdout.length + ' 字符' : 'exit ' + code} (${Math.round((Date.now() - start) / 1000)}s)`);
-                resolve({ key: cfg.key, name: cfg.name, ok, chars: stdout.length, file: path.basename(file), receipt, exit: code });
+                resolve({ key: cfg.key, name: cfg.name, ok, status: ok ? 'ok' : status, flags, chars: stdout.length, preview, file: path.basename(file), receipt, exit: code });
             });
             child.on('error', (e) => {
                 if (n < MAX_ATTEMPTS) return attempt(n + 1);
@@ -76,11 +97,16 @@ function runOne(cfg, prompt, outDir, idx = 0) {
 }
 
 async function main() {
-    let prompt = process.argv.slice(2).join(' ');
+    const argvPrompt = process.argv.slice(2).join(' ');
+    let prompt = argvPrompt;
     if (!prompt && !process.stdin.isTTY) prompt = fs.readFileSync(0, 'utf8').trim();
     if (!prompt) {
         process.stderr.write('Usage: node scripts/multi-ai-chat.js "问题"   或  echo "问题" | node scripts/multi-ai-chat.js\n');
         process.exit(64);
+    }
+    // P1：命令行传参遇特殊字符易被 shell 转义损坏，提示改用 stdin（不强制，避免破坏旧用法）
+    if (argvPrompt && /["'`\\$()&|;]/.test(argvPrompt)) {
+        process.stderr.write('[multi-ai-chat] ⚠ 问题含特殊字符，建议改用 stdin 传参避免 shell 转义损坏：node scripts/multi-ai-chat.js < 问题.txt\n');
     }
 
     // 每次运行一个文件夹：answers/<时间戳>/raw/<provider>.md
@@ -94,17 +120,45 @@ async function main() {
     const results = await Promise.all(PROVIDERS.map((cfg, i) => runOne(cfg, prompt, rawDir, i)));
 
     const okCount = results.filter((r) => r.ok).length;
+    // P0-3 降级判定：ok 数 ≥ min_providers_ok → full（完整文档）；≥1 → partial（初步分析）；
+    // 0 → insufficient（证据不足，不建议行动）。阈值可配 config.yml。
+    const minOk = CONFIG.min_providers_ok != null ? CONFIG.min_providers_ok : 3;
+    const decision = okCount >= minOk ? 'full' : okCount >= 1 ? 'partial' : 'insufficient';
     const receipt = emitReceipt({
         skill: 'web-ai-chat/multi-ai-chat', runId: makeRunId(),
-        fields: { mode: 'multi-ai-chat', ok_count: okCount, total: PROVIDERS.length, elapsed_ms: Date.now() - start },
+        fields: { mode: 'multi-ai-chat', ok_count: okCount, total: PROVIDERS.length, decision, elapsed_ms: Date.now() - start },
         stream: 'stderr',
     });
+
+    // P0-2 上下文控制：manifest.json 含每路 status/chars/preview，主 agent 先读 manifest
+    // 决定读取哪些 raw 全文，避免 7 份原文一次性灌入上下文。
+    const manifest = {
+        timestamp: ts,
+        total: PROVIDERS.length,
+        ok_count: okCount,
+        min_providers_ok: minOk,
+        decision,
+        providers: results.map((r) => ({
+            key: r.key, name: r.name,
+            status: r.status || (r.ok ? 'ok' : 'failed'),
+            flags: r.flags || [],
+            chars: r.chars || 0,
+            file: r.file || '',
+            preview: r.preview || '',
+        })),
+        usage: '主 agent 先读本文件决定读取哪些 raw；preview 为每路回答前 240 字符；status: ok | suspicious | blocked | failed',
+    };
+    const manifestPath = path.join(runDir, 'manifest.json');
+    try { fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2)); } catch (_) {}
 
     console.log(JSON.stringify({
         ok_count: okCount,
         total: PROVIDERS.length,
+        decision,
+        min_providers_ok: minOk,
         elapsed_ms: Date.now() - start,
         answers_dir: runDir,
+        manifest: manifestPath,
         results,
         receipt,
     }, null, 2));
