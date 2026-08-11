@@ -2,7 +2,7 @@
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![免费](https://img.shields.io/badge/免费-无需API%20Key-brightgreen.svg)
-![6 家网页 AI](https://img.shields.io/badge/6家网页AI-同时咨询-orange.svg)
+![7 家网页 AI](https://img.shields.io/badge/7家网页AI-同时咨询-orange.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933.svg)
 
 ## 免费多 AI 研究助手：让你的 Agent 同时咨询多个顶级 AI，并生成经过交叉验证的决策方案
@@ -91,7 +91,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 
 ## 🧠 多 AI 为什么更可靠？
 
-不是因为「6 个 AI 一定比一个 AI 聪明」，而是**独立观点 + 交叉验证**——类似专家评审：
+不是因为「7 个 AI 一定比一个 AI 聪明」，而是**独立观点 + 交叉验证**——类似专家评审：
 
 ```
 专家 A ──┐
@@ -163,7 +163,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 
 ## 💰 真正免费
 
-不调用任何商业 API。利用 6 家**网页版 AI**，通过**你自己的浏览器登录态**运行：
+不调用任何商业 API。利用 7 家**网页版 AI**，通过**你自己的浏览器登录态**运行：
 
 ```
 无需                 只需要
@@ -197,7 +197,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 单个 AI 的问答管线（`lib/engine.js`）：
 
 ```
-导航 → 登录检查 → 模式设置(自校验) → 找输入框 → 输入 → 发送 → 等回复(稳定轮询) → 提取 → 后处理
+导航 → 登录检查 → 页面风控拦截 → 模式设置(自校验) → 找输入框 → 输入 → 发送 → 等回复(稳定轮询) → 提取 → 后处理 → 有效性分类(ok/suspicious/blocked)
 ```
 
 每个 AI 的差异（选择器、延迟、发送键、回复容器、模式开启、后处理）全部隔离在 `providers/*.js`，引擎只实现稳定通用的步骤——**新增一个 AI 只需加一个配置文件**。
@@ -227,6 +227,18 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 node scripts/ask.js --only=Kimi "你好" 2>&1 | grep 'receipt'
 # [receipt] AGENTCHAT_RUN {"run_id":"ac-1a2b3c...","provider_used":"kimi","exit":0,...}
 ```
+
+**回答有效性治理**（P0 假成功拦截）：拿到的「回答」不直接采信，先做三态分类（`lib/validate.js`）——
+
+- **blocked**：页面风控/验证（URL/标题/挑战 DOM 元素）、限流/额度/拒答/验证码文案（长度无关）→ 硬失败 `exit 3`，不重试
+- **suspicious**：与旧会话残留高度相似（STALE）、过短（TOO_SHORT）、发送前后消息数未增（NO_NEW）、提取到用户问题本身（回声）→ 低可信 `exit 5`，重试一次
+- **ok**：其余 → 视为可信回答，`ok:true` 的语义是「获得可信回答」而非「脚本提取到文本」
+
+**上下文控制**：`multi-ai-chat` 每轮落盘 `answers/<时间戳>/manifest.json`，列出每路 `status / chars / preview`（前 240 字符）——主 agent 先读 manifest 决定读哪些 `raw/*.md` 全文，避免 7 份原文一次性灌入上下文。某路 `ok:false` 如实记录，禁止伪造。
+
+**exit 码**：`0`=ok / `3`=拒答·风控 / `5`=可疑 / `9`=全部失败。
+
+**降级**：`ok_count / total` 按 `min_providers_ok`（默认 3）判定 `decision`——`full`（完整文档）/ `partial`（低可信初步分析）/ `insufficient`（证据不足，不建议行动）。
 
 ---
 
@@ -277,8 +289,9 @@ npm run multi-ai-chat -- "对比 Rust 和 Go 做 CLI 工具的优缺点"
 ```yaml
 providers: [qwen, deepseek, kimi, doubao, chatgpt, gemini, grok]  # 并行列表
 timeout:
-  perProvider: 150000    # 单个 AI 最长等待（毫秒）
+  perProvider: 600000    # 单个 AI 最长等待（毫秒）
 retry: 3                 # 单个 AI 失败后自动重试次数
+min_providers_ok: 3      # ok 路数 ≥ 此值生成完整决策文档；否则降级（partial/insufficient）
 ```
 
 ---
@@ -291,17 +304,19 @@ multi-ai-chat-skill/
 │   ├── lib/
 │   │   ├── cdp.js          # CDP 连接 + 自动拉起 Chrome + 安全 .env 加载
 │   │   ├── engine.js       # 问答管线核心（导航/输入/发送/稳定等待/提取）
+│   │   ├── validate.js     # 回答三态分类（ok/suspicious/blocked 假成功拦截）
 │   │   ├── config.js       # config.yml 加载
 │   │   ├── receipt.js      # 机器可验证回执 [receipt] AGENTCHAT_RUN {...}
 │   │   └── terminal.js     # stderr 日志
 │   ├── providers/          # 7 个 AI 的驱动配置（选择器/延迟/模式/后处理）
-│   ├── multi-ai-chat.js    # 7 路并行派发（流程入口）
+│   ├── multi-ai-chat.js    # 7 路并行派发（流程入口，落盘 manifest.json）
 │   ├── ask.js              # 单问（降级链）
 │   ├── login.js            # 打开 7 站点供手动登录（幂等）
 │   └── doctor.js           # 环境体检
-├── answers/                # AI 原始回答落盘（<时间戳>/raw/）
-├── config.yml              # 并行 AI 列表 / 超时 / 重试
-├── evals/                  # 技能评估用例
+├── answers/                # AI 原始回答落盘（<时间戳>/raw/ + manifest.json）
+├── config.yml              # 并行 AI 列表 / 超时 / 重试 / 降级阈值
+├── references/             # 决策文档模板（decision-format.md）
+├── evals/                  # 有效性分类器回归测试（validate.test.js）
 └── .env                    # CDP / Chrome 配置（从 .env.example 复制）
 ```
 
@@ -321,11 +336,15 @@ A：这些模式在网页端不跨会话持久化，所以每次运行由 `setup
 **Q：`ask.js` 全部失败？**
 A：先跑 `npm run doctor` 确认 CDP 可达；再确认目标站点已登录、未被风控要求验证码。
 
+**Q：怎么保证拿到的回答是真的，不是限流提示 / 旧会话残留？**
+A：`lib/validate.js` 对提取文本做三态分类——限流/额度/验证码/登录文案（与问题无关）判 `blocked`（exit 3 不重试）；与旧会话残留高度相似 / 过短 / 消息数未增 / 提取到用户问题本身判 `suspicious`（exit 5 重试一次）；其余才判 `ok`。`ok:true` 只表示「获得可信回答」。
+
 ---
 
 ## 🗺️ 规划
 
-- [x] 6 路并行派发 + 降级链
+- [x] 7 路并行派发 + 降级链
+- [x] 回答有效性三态分类（ok/suspicious/blocked 假成功拦截）
 - [x] 每个 AI 的模式自动开启与自校验
 - [ ] 回答质量对比 / 投票汇总
 - [ ] 多轮追问（带上下文）

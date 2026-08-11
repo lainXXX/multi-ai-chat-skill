@@ -199,7 +199,7 @@ All sites share **the same logged-in Chrome**, driven over CDP (Chrome DevTools 
 The per-AI Q&A pipeline (`lib/engine.js`):
 
 ```
-navigate → auth check → setup mode (self-verifying) → find editor → type → send → wait for reply (stability polling) → extract → post-process
+navigate → auth check → block risk interception → setup mode (self-verifying) → find editor → type → send → wait for reply (stability polling) → extract → post-process → validity classification (ok/suspicious/blocked)
 ```
 
 Every AI-specific difference (selectors, delays, send key, reply container, mode setup, post-processing) lives in `providers/*.js`; the engine implements only stable, generic steps — **adding a new AI means adding one config file**.
@@ -229,6 +229,18 @@ Every run emits a verifiable receipt; the `run_id` proves the run actually happe
 node scripts/ask.js --only=Kimi "hi" 2>&1 | grep 'receipt'
 # [receipt] AGENTCHAT_RUN {"run_id":"ac-1a2b3c...","provider_used":"kimi","exit":0,...}
 ```
+
+**Answer validity governance** (P0: kill fake success): the extracted "answer" isn't trusted as-is; it goes through three-state classification (`lib/validate.js`):
+
+- **blocked**: page-level risk / verification (URL / title / challenge DOM), rate-limit / quota / refusal / CAPTCHA text (length-independent) → hard failure `exit 3`, no retry
+- **suspicious**: highly similar to old-session residue (STALE), too short (TOO_SHORT), no new message after sending (NO_NEW), or the extracted text is the user's own prompt (echo) → low confidence `exit 5`, retried once
+- **ok**: everything else → treated as a trustworthy answer; `ok:true` means "got a credible answer," not "the script extracted text"
+
+**Context control**: each `multi-ai-chat` run writes `answers/<timestamp>/manifest.json`, listing each route's `status / chars / preview` (first 240 chars) — the main agent reads the manifest first, then decides which `raw/*.md` files to read in full, instead of dumping all 7 raw answers into context at once. A route with `ok:false` is recorded honestly; fabrication is forbidden.
+
+**Exit codes**: `0`=ok / `3`=refused·blocked / `5`=suspicious / `9`=all failed.
+
+**Degradation**: `ok_count / total` against `min_providers_ok` (default 3) yields `decision` — `full` (complete document) / `partial` (low-confidence preliminary analysis) / `insufficient` (insufficient evidence, don't act).
 
 ---
 
@@ -279,8 +291,9 @@ npm run multi-ai-chat -- "Compare Rust vs Go for building CLI tools"
 ```yaml
 providers: [qwen, deepseek, kimi, doubao, chatgpt, gemini, grok]  # parallel list
 timeout:
-  perProvider: 150000    # max wait per AI (ms)
+  perProvider: 600000    # max wait per AI (ms)
 retry: 3                 # auto-retries after a per-AI failure
+min_providers_ok: 3      # ok routes ≥ this → full decision document; otherwise degrade (partial/insufficient)
 ```
 
 ---
@@ -293,17 +306,19 @@ multi-ai-chat-skill/
 │   ├── lib/
 │   │   ├── cdp.js          # CDP connect + auto-launch Chrome + safe .env loading
 │   │   ├── engine.js       # Q&A pipeline core (navigate/type/send/stability-wait/extract)
+│   │   ├── validate.js     # three-state answer classification (ok/suspicious/blocked fake-success gate)
 │   │   ├── config.js       # config.yml loader
 │   │   ├── receipt.js      # machine-verifiable receipts [receipt] AGENTCHAT_RUN {...}
 │   │   └── terminal.js     # stderr logging
 │   ├── providers/          # driver configs for the 7 AIs (selectors/delays/modes/post-processing)
-│   ├── multi-ai-chat.js    # 6-way parallel dispatch (entry point)
+│   ├── multi-ai-chat.js    # 7-way parallel dispatch (entry point, writes manifest.json)
 │   ├── ask.js              # single ask (fallback chain)
 │   ├── login.js            # open the 7 sites for manual login (idempotent)
 │   └── doctor.js           # environment health check
-├── answers/                # raw AI answers (<timestamp>/raw/)
-├── config.yml              # parallel AI list / timeout / retry
-├── evals/                  # skill evaluation cases
+├── answers/                # raw AI answers (<timestamp>/raw/ + manifest.json)
+├── config.yml              # parallel AI list / timeout / retry / degradation threshold
+├── references/             # decision-document template (decision-format.md)
+├── evals/                  # validity-classifier regression tests (validate.test.js)
 └── .env                    # CDP / Chrome config (copy from .env.example)
 ```
 
@@ -323,11 +338,15 @@ A: These modes don't persist across sessions on the web side, so `setupMode` re-
 **Q: `ask.js` fails on every provider?**
 A: First run `npm run doctor` to confirm CDP is reachable; then check the target site is logged in and isn't blocked by a CAPTCHA.
 
+**Q: How do I know the answer is genuine and not a rate-limit message / old-session residue?**
+A: `lib/validate.js` classifies the extracted text into three states — rate-limit / quota / CAPTCHA / login text (unrelated to the prompt) is `blocked` (exit 3, no retry); text highly similar to old-session residue, too short, no new message after sending, or echoing the user's own prompt is `suspicious` (exit 5, retried once); only everything else is `ok`. `ok:true` means "got a credible answer."
+
 ---
 
 ## 🗺️ Roadmap
 
-- [x] 6-way parallel dispatch + fallback chain
+- [x] 7-way parallel dispatch + fallback chain
+- [x] Three-state answer validity classification (ok/suspicious/blocked fake-success gate)
 - [x] Per-AI mode auto-enable with self-verification
 - [ ] Answer quality comparison / voting summary
 - [ ] Multi-turn follow-up (with context)
