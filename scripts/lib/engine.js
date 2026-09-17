@@ -22,6 +22,8 @@ function hostnameOf(u) {
     try { return new URL(u).hostname; } catch { return ''; }
 }
 
+const norm = (s) => String(s || '').replace(/\s+/g, '').toLowerCase();
+
 function pageMatches(page, cfg) {
     const hosts = cfg.hosts || [hostnameOf(cfg.url)].filter(Boolean);
     const h = hostnameOf(page.url());
@@ -252,7 +254,7 @@ async function drive(cfg, prompt, opts = {}) {
 
         // 拒答/不可用兜底：AI 明确拒答、知识截止或服务提示（如额度用尽）不视为有效研究结果，
         // 判 refused 交给上层（不重试）避免把非回答当研究内容落盘。通用模式 + 各 provider 自有
-        // cfg.refusalPattern（如 Doubao 额度提示）取并集。
+        // cfg.refusalPattern（如额度提示）取并集。
         const refusalPatterns = [
             /(我的知识(截止|只到|停留|库|范围)|我[^。；;]{0,8}无法(提供|回答|获取|访问))/,
             ...(cfg.refusalPattern ? [cfg.refusalPattern] : []),

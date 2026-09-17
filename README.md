@@ -2,7 +2,7 @@
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![免费](https://img.shields.io/badge/免费-无需API%20Key-brightgreen.svg)
-![7 家网页 AI](https://img.shields.io/badge/7家网页AI-同时咨询-orange.svg)
+![6 家网页 AI](https://img.shields.io/badge/6家网页AI-同时咨询-orange.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933.svg)
 
 ## 免费多 AI 研究助手：让你的 Agent 同时咨询多个顶级 AI，并生成经过交叉验证的决策方案
@@ -56,8 +56,7 @@ Claude Code 补充上下文
 | 专家 | Qwen | 中文理解、工程实践 |
 | 专家 | DeepSeek | 技术分析、代码能力 |
 | 专家 | Kimi | 长文本理解、资料整理 |
-| 专家 | Doubao | 中文场景、字节生态、产品迭代速度 |
-| 专家 | Grok | xAI 生态、深度推理、风格直接 |
+| 专家 | AI Studio | Gemini 模型原厂入口、可调系统指令与工具（Grounding/代码执行） |
 
 ---
 
@@ -85,13 +84,13 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 考虑类型支持 / 长期维护 / 团队协作 / 生态风险，给出最终推荐。
 ```
 
-这样多个 AI 回答的是**同一个真实问题**，而不是各自脑补——这正是多 AI 方案区别于「把问题复制粘贴给 7 个 AI」的核心。
+这样多个 AI 回答的是**同一个真实问题**，而不是各自脑补——这正是多 AI 方案区别于「把问题复制粘贴给 6 个 AI」的核心。
 
 ---
 
 ## 🧠 多 AI 为什么更可靠？
 
-不是因为「7 个 AI 一定比一个 AI 聪明」，而是**独立观点 + 交叉验证**——类似专家评审：
+不是因为「6 个 AI 一定比一个 AI 聪明」，而是**独立观点 + 交叉验证**——类似专家评审：
 
 ```
 专家 A ──┐
@@ -115,7 +114,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 
 ## 🧩 为什么是这几个 AI？
 
-不是「最强七个」，而是一组**能力方向互补的平衡型 AI Panel**。选择综合权衡了：模型能力 / 免费可用性 / 网页端能力 / 搜索能力 / 中文表现 / 长文本能力 / 稳定性 / 用户覆盖。
+不是「最强六个」，而是一组**能力方向互补的平衡型 AI Panel**。选择综合权衡了：模型能力 / 免费可用性 / 网页端能力 / 搜索能力 / 中文表现 / 长文本能力 / 稳定性 / 用户覆盖。
 
 | AI | 选它而不是别的 |
 |----|---------------|
@@ -124,8 +123,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 | Kimi | 长文本、中文资料处理 |
 | DeepSeek | 技术问题、编程分析、推理成本优势 |
 | Qwen | 中文能力、阿里生态 |
-| Doubao | 中文场景、字节生态、迭代快 |
-| Grok | xAI 深度推理、实时信息、风格直接 |
+| AI Studio | Gemini 模型原厂入口，可调系统指令与工具，模型版本可控 |
 
 > 这些不是唯一选择，而是经过综合权衡的一组组合。随时可在 `config.yml` 里自由增删。
 
@@ -163,7 +161,7 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 
 ## 💰 真正免费
 
-不调用任何商业 API。利用 7 家**网页版 AI**，通过**你自己的浏览器登录态**运行：
+不调用任何商业 API。利用 6 家**网页版 AI**，通过**你自己的浏览器登录态**运行：
 
 ```
 无需                 只需要
@@ -188,10 +186,10 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
                │  Playwright-core over CDP
 ┌──────────────▼───────────────┐
 │        共享 Chrome            │  http://127.0.0.1:9222
-│    （已登录 7 个站点）          │
+│    （已登录 6 个站点）          │
 └──────┬────┬────┬────┬────┬───┘
        ▼    ▼    ▼    ▼    ▼
-    Qwen DeepSeek Kimi Doubao ChatGPT Gemini · Grok
+    Qwen DeepSeek Kimi ChatGPT Gemini · AI Studio
 ```
 
 单个 AI 的问答管线（`lib/engine.js`）：
@@ -209,10 +207,9 @@ multi-ai-chat-skill 的做法：主 agent 先把**用户问题 + 项目背景 + 
 | ChatGPT | 网页搜索 | 输入区上方的「搜索网页」建议 chip，点击后进入高亮的「网页搜索」态 |
 | Qwen | 网页搜索 | 「+」菜单 → 更多 → 网页搜索；思考模式默认已开启，无需处理 |
 | DeepSeek | 专家模式 | 空对话态三选一（快速 / 专家 / 识图），需在会话开始前设置 |
-| Doubao | 专家模式 | 专家研究级专业问答（2.1 Turbo） |
 | Gemini | 扩展思考 | 模式选择器 →「扩展思考」（Pro + Extended Thinking），不跨会话持久化每次重开；回答前的"Gemini 说"前缀由 postResponseHook 剥离 |
 | Kimi | 无需设置 | 开箱即用，默认即长文本模式 |
-| Grok | 无需设置 | 默认 Fast 模型，开箱即用 |
+| AI Studio | 无需设置 | 沿用页面当前所选模型与工具开关（Grounding / 代码执行等在网页端持久化）；回复容器自带的 "Model HH:MM" 抬头由 postResponseHook 剥离 |
 
 **机器契约**（脚本与上层 agent 的约定）：
 
@@ -253,7 +250,7 @@ npm install
 # 2. 复制配置模板并按需修改
 cp .env.example .env
 
-# 3. 打开 7 个站点 → 在弹出的 Chrome 里手动登录一次（以后永久复用）
+# 3. 打开 6 个站点 → 在弹出的 Chrome 里手动登录一次（以后永久复用）
 npm run login
 
 # 4. 环境体检（CDP 可达性 + 各站点 tab 状态）
@@ -261,7 +258,7 @@ npm run doctor
 ```
 
 ```bash
-# 单问：按降级链自动尝试（chatgpt → grok → qwen → kimi → deepseek → doubao → gemini）
+# 单问：按降级链自动尝试（chatgpt → qwen → kimi → deepseek → gemini → aistudio）
 npm run ask -- "React 19 和 Vue 3.5 怎么选？"
 
 # 指定某个 AI
@@ -270,7 +267,7 @@ npm run ask -- --from=Kimi "如何用 CSS 实现毛玻璃效果？"
 # 大段内容 / 文件内容走 stdin
 node scripts/ask.js < question.txt
 
-# 7 路并行：同一问题同时问 7 个 AI，答案落盘
+# 6 路并行：同一问题同时问 6 个 AI，答案落盘
 npm run multi-ai-chat -- "对比 Rust 和 Go 做 CLI 工具的优缺点"
 ```
 
@@ -287,7 +284,7 @@ npm run multi-ai-chat -- "对比 Rust 和 Go 做 CLI 工具的优缺点"
 `config.yml`：
 
 ```yaml
-providers: [qwen, deepseek, kimi, doubao, chatgpt, gemini, grok]  # 并行列表
+providers: [qwen, deepseek, kimi, chatgpt, gemini, aistudio]  # 并行列表
 timeout:
   perProvider: 600000    # 单个 AI 最长等待（毫秒）
 retry: 3                 # 单个 AI 失败后自动重试次数
@@ -308,10 +305,10 @@ multi-ai-chat-skill/
 │   │   ├── config.js       # config.yml 加载
 │   │   ├── receipt.js      # 机器可验证回执 [receipt] AGENTCHAT_RUN {...}
 │   │   └── terminal.js     # stderr 日志
-│   ├── providers/          # 7 个 AI 的驱动配置（选择器/延迟/模式/后处理）
-│   ├── multi-ai-chat.js    # 7 路并行派发（流程入口，落盘 manifest.json）
+│   ├── providers/          # 6 个 AI 的驱动配置（选择器/延迟/模式/后处理）
+│   ├── multi-ai-chat.js    # 6 路并行派发（流程入口，落盘 manifest.json）
 │   ├── ask.js              # 单问（降级链）
-│   ├── login.js            # 打开 7 站点供手动登录（幂等）
+│   ├── login.js            # 打开 6 站点供手动登录（幂等）
 │   └── doctor.js           # 环境体检
 ├── answers/                # AI 原始回答落盘（<时间戳>/raw/ + manifest.json）
 ├── config.yml              # 并行 AI 列表 / 超时 / 重试 / 降级阈值
@@ -343,7 +340,7 @@ A：`lib/validate.js` 对提取文本做三态分类——限流/额度/验证�
 
 ## 🗺️ 规划
 
-- [x] 7 路并行派发 + 降级链
+- [x] 6 路并行派发 + 降级链
 - [x] 回答有效性三态分类（ok/suspicious/blocked 假成功拦截）
 - [x] 每个 AI 的模式自动开启与自校验
 - [ ] 回答质量对比 / 投票汇总

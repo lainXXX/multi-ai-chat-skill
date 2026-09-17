@@ -27,7 +27,7 @@ const PER_PROVIDER_MS = String(CONFIG.timeout && CONFIG.timeout.perProvider || 1
 const MAX_ATTEMPTS = 1 + (CONFIG.retry || 0);
 
 if (!PROVIDERS.length) {
-    process.stderr.write('config.yml 的 providers 列表为空或全部无效。可选: qwen/deepseek/kimi/doubao/chatgpt/gemini/grok\n');
+    process.stderr.write('config.yml 的 providers 列表为空或全部无效。可选: qwen/deepseek/kimi/chatgpt/gemini/aistudio\n');
     process.exit(64);
 }
 
@@ -59,7 +59,7 @@ function runOne(cfg, prompt, outDir, idx = 0) {
                 const preview = stdout.slice(0, 240);
 
                 // 拒答/服务提示（exit 3 = refused/blocked）：永久性失败，同 prompt 重试无意义，
-                // 避免对额度/拒答提示重复烧时间（如 Doubao 额度用尽时不再多次重试）。
+                // 避免对额度/拒答提示重复烧时间（如额度用尽时不再多次重试）。
                 if (code === 3) {
                     try { fs.writeFileSync(file, stdout.trim()); } catch (_) {}
                     log('multi-ai-chat', `✗ ${cfg.name}: 拒答/服务提示（不重试）`);

@@ -2,15 +2,14 @@
 # 改这里就能调整运行行为，不用动代码。
 
 # 并行执行的 AI（配几个并行几个）
-# 可选：qwen / deepseek / kimi / doubao / chatgpt / gemini / grok
+# 可选：qwen / deepseek / kimi / chatgpt / gemini / aistudio
 providers:
   - qwen
   - deepseek
   - kimi
-  - doubao
   - chatgpt
   - gemini
-  - grok
+  - aistudio
 
 # 超时（毫秒）
 timeout:
